@@ -15,16 +15,16 @@ class OrderController < ApplicationController
         product = ShopifyAPI::Product.find id: line_item["product_id"]  # qw12 TESTING!!
 
         # identify the tube and carton variant 
-        carton_variant = product.variants.select{|v| v.option1&.downcase == "carton" or v.option2&.downcase == "carton" or v.option3&.downcase == "carton"} .first
-        tube_variant = product.variants.select{|v| v.option1&.downcase == "individual" or v.option2&.downcase == "individual" or v.option3&.downcase == "individual"} .first
+        carton_variant_ids = product.variants.select{|v| v.option1&.downcase&.include? "carton" or v.option2&.downcase&.include? "carton" or v.option3&.downcase&.include? "carton"}.map{|v| v.id}
+        tube_variant = product.variants.select{|v| v.option1&.downcase == "individual" or v.option2&.downcase == "individual" or v.option3&.downcase == "individual"}.first
 
         # get the number of tubes per carton
         metafields = ShopifyAPI::Metafield.all(metafield: {"owner_id" => product.id, "owner_resource" => "product"})
         tubes_per_carton_metafield = metafields.select{|m| m.key == "tube_per_carton" and m.namespace == "custom"}.first
         tubes_per_carton = tubes_per_carton_metafield.value if tubes_per_carton_metafield
 
-        puts Colorize.cyan("tubes_per_carton: #{tubes_per_carton}, current/carton id: #{line_item["variant_id"]}/#{carton_variant}")
-        if tubes_per_carton and line_item["variant_id"] == carton_variant  # qw12 TESTING!! OR/AND
+        puts Colorize.cyan("tubes_per_carton: #{tubes_per_carton}, current/carton id: #{line_item["variant_id"]}/#{carton_variant_ids}")
+        if tubes_per_carton and carton_variant_ids.include? line_item["variant_id"] # qw12 TESTING!! OR/AND
           order = Order.find_by_order_id params["order"]["id"]
           unless order
             # get InventoryLevel object for the tube variant
@@ -69,16 +69,16 @@ class OrderController < ApplicationController
         product = ShopifyAPI::Product.find id: line_item["product_id"] # qw12 TESTING!!
 
         # identify the tube and carton variant 
-        carton_variant = product.variants.select{|v| v.option1&.downcase == "carton" or v.option2&.downcase == "carton" or v.option3&.downcase == "carton"} .first
-        tube_variant = product.variants.select{|v| v.option1&.downcase == "individual" or v.option2&.downcase == "individual" or v.option3&.downcase == "individual"} .first
+        carton_variant_ids = product.variants.select{|v| v.option1&.downcase&.include? "carton" or v.option2&.downcase&.include? "carton" or v.option3&.downcase&.include? "carton"}.map{|v| v.id}
+        tube_variant = product.variants.select{|v| v.option1&.downcase == "individual" or v.option2&.downcase == "individual" or v.option3&.downcase == "individual"}.first
 
         # get the number of tubes per carton
         metafields = ShopifyAPI::Metafield.all(metafield: {"owner_id" => product.id, "owner_resource" => "product"})
         tubes_per_carton_metafield = metafields.select{|m| m.key == "tube_per_carton" and m.namespace == "custom"}.first
         tubes_per_carton = tubes_per_carton_metafield.value if tubes_per_carton_metafield
 
-        puts Colorize.cyan("tubes_per_carton: #{tubes_per_carton}, current/carton id: #{line_item["variant_id"]}/#{carton_variant}")
-        if tubes_per_carton and line_item["variant_id"] == carton_variant and refund_item["restock_type"] != "no_restock" # qw12 TESTING!! OR/AND
+        puts Colorize.cyan("tubes_per_carton: #{tubes_per_carton}, current/carton id: #{line_item["variant_id"]}/#{carton_variant_ids}")
+        if tubes_per_carton and carton_variant_ids.include? line_item["variant_id"] and refund_item["restock_type"] != "no_restock" # qw12 TESTING!! OR/AND
           order = Order.find_by_order_id "re_#{params["order"]["id"]}"
           unless order
             # get InventoryLevel object for the tube variant
