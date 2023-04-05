@@ -18,7 +18,7 @@ module PaperTube
       scope: "write_products, write_orders",
       session_storage: ShopifyAPI::Auth::FileSessionStorage.new, # See more details below
       is_embedded: false, # Set to true if you are building an embedded app
-      api_version: "2023-01", # The version of the API you would like to use
+      api_version: "2022-10", # The version of the API you would like to use
       is_private: true, # Set to true if you have an existing private app
     )
     # Configuration for the application, engines, and railties goes here.
