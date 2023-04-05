@@ -48,6 +48,52 @@ class OrderController < ApplicationController
 
         end
 
+        # add Inventory back if the tube variant is purchased
+        if line_item["variant_id"] == tube_variant&.id
+          # qw12
+          tube_quantity = line_item["quantity"]
+          inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: tube_variant.inventory_item_id
+
+          order = Order.find_by_order_id params["order"]["id"]
+          unless order
+            # change InventoryLevel object for the tube variant
+            if tube_variant.inventory_management = 'shopify'
+              if inventory_levels[0].adjust(
+                  location_id: inventory_levels[0].location_id, 
+                  inventory_item_id: inventory_levels[0].inventory_item_id, 
+                  available_adjustment: tube_quantity)
+                          # save order so it isn't duplicated
+                order = Order.new
+                order.order_id = params["order"]["id"]
+                order.save
+                puts Colorize.green("Returned inv #{product.title} - #{tube_variant.title}")
+              end
+            end
+          end
+        end
+
+        ptc_found = false
+        for line_item in params["line_items"]
+          inv = ShopifyAPI::InventoryLevel.all inventory_item_ids: line_item["variant_id"]
+          if inv.length > 0
+            l = ShopifyAPI::Location.find id: inv.first.location_id
+            if l.name == "PTC"
+              ptc_found = true
+              break
+            end
+          end
+        end
+
+        if ptc_found
+          order = ShopifyAPI::Order.find id: params["id"]
+          if order.tags.length == 0
+            order.tags = "PTC"
+          else
+            order.tags << ", PTC"
+          end
+          order.save
+        end
+
         if Date.today.day == 1
           Order.where("created_at < ?", 7.days.ago).destroy_all
         end
