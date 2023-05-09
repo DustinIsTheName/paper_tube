@@ -71,46 +71,46 @@ class OrderController < ApplicationController
             end
           end
         end
-
-        screen_printing = false
-        ptc_found = false
-        for line_item in params["line_items"]
-          inv = ShopifyAPI::InventoryLevel.all inventory_item_ids: line_item["variant_id"]
-          if inv.length > 0
-            l = ShopifyAPI::Location.find id: inv.first.location_id
-            if l.name == "PTC"
-              ptc_found = true
-            end
-          end
-          if line_item["title"] == "Screen Printing"
-            screen_printing = true
+      end
+      
+      screen_printing = false
+      ptc_found = false
+      for line_item in params["line_items"]
+        inv = ShopifyAPI::InventoryLevel.all inventory_item_ids: line_item["variant_id"]
+        if inv.length > 0
+          l = ShopifyAPI::Location.find id: inv.first.location_id
+          if l.name == "PTC"
+            ptc_found = true
           end
         end
-
-        if ptc_found or screen_printing
-          order = ShopifyAPI::Order.find id: params["id"]
-          if ptc_found
-            puts Colorize.green "add PTC tag"
-            if order.tags.length == 0
-              order.tags = "PTC"
-            else
-              order.tags << ", PTC"
-            end
-          end
-          if screen_printing
-            puts Colorize.green "add ScreenPrinting tag"
-            if order.tags.length == 0
-              order.tags = "ScreenPrinting"
-            else
-              order.tags << ", ScreenPrinting"
-            end
-          end
-          order.save
+        if line_item["title"] == "Screen Printing"
+          screen_printing = true
         end
+      end
 
-        if Date.today.day == 1
-          Order.where("created_at < ?", 7.days.ago).destroy_all
+      if ptc_found or screen_printing
+        order = ShopifyAPI::Order.find id: params["id"]
+        if ptc_found
+          puts Colorize.green "add PTC tag"
+          if order.tags.length == 0
+            order.tags = "PTC"
+          else
+            order.tags << ", PTC"
+          end
         end
+        if screen_printing
+          puts Colorize.green "add ScreenPrinting tag"
+          if order.tags.length == 0
+            order.tags = "ScreenPrinting"
+          else
+            order.tags << ", ScreenPrinting"
+          end
+        end
+        order.save
+      end
+
+      if Date.today.day == 1
+        Order.where("created_at < ?", 7.days.ago).destroy_all
       end
     end
 
