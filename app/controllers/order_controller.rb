@@ -10,69 +10,49 @@ class OrderController < ApplicationController
     if verified
 
       for line_item in params["line_items"]
-        # product = ShopifyAPI::Product.find id: 8129157857554 # <==== test product
+        # product = ShopifyAPI::Product.find id: 2572782862436 # <==== test product
         # get the Shopify Product purchased in this line item
         product = ShopifyAPI::Product.find id: line_item["product_id"]  # qw12 TESTING!!
 
         # identify the tube and carton variant 
         carton_variant_ids = product.variants.select{|v| v.option1&.downcase&.include? "carton" or v.option2&.downcase&.include? "carton" or v.option3&.downcase&.include? "carton"}.map{|v| v.id}
-        tube_variant = product.variants.select{|v| v.option1&.downcase == "individual" or v.option2&.downcase == "individual" or v.option3&.downcase == "individual"}.first
+        purchased_carton_variant = product.variants.select{|v| v.id == line_item["variant_id"]}.first
+        # remove variable tubes_per_carton below
 
-        # get the number of tubes per carton
-        metafields = ShopifyAPI::Metafield.all(metafield: {"owner_id" => product.id, "owner_resource" => "product"})
-        tubes_per_carton_metafield = metafields.select{|m| m.key == "tube_per_carton" and m.namespace == "custom"}.first
-        tubes_per_carton = tubes_per_carton_metafield.value if tubes_per_carton_metafield
-
-        puts Colorize.cyan("tubes_per_carton: #{tubes_per_carton}, current/carton id: #{line_item["variant_id"]}/#{carton_variant_ids}")
-        if tubes_per_carton and carton_variant_ids.include? line_item["variant_id"] # qw12 TESTING!! OR/AND
+        if carton_variant_ids.include? line_item["variant_id"] # qw12 TESTING!! OR/AND
           order = Order.find_by_order_id params["order"]["id"]
           unless order
-            # get InventoryLevel object for the tube variant
-            tube_quantity = line_item["quantity"] * tubes_per_carton
-            inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: tube_variant.inventory_item_id
 
-            # change InventoryLevel object for the tube variant
-            if tube_variant.inventory_management = 'shopify'
-              if inventory_levels[0].adjust(
-                  location_id: inventory_levels[0].location_id, 
-                  inventory_item_id: inventory_levels[0].inventory_item_id, 
-                  available_adjustment: tube_quantity * -1)
-                          # save order so it isn't duplicated
-                order = Order.new
-                order.order_id = params["order"]["id"]
-                order.save
-                puts Colorize.green("Updated #{product.title} - #{tube_variant.title}")
+            for carton_variant_id in carton_variant_ids
+              unless line_item["variant_id"] == carton_variant_id
+                carton_variant = product.variants.select{|v| v.id == carton_variant_id}.first
+
+                # get InventoryLevel object for the tube variant
+                quantity = line_item["quantity"]
+                inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: carton_variant.inventory_item_id
+
+                # change InventoryLevel object for the tube variant
+                if carton_variant.inventory_management = 'shopify'
+                  if inventory_levels[0].adjust(
+                      location_id: inventory_levels[0].location_id, 
+                      inventory_item_id: inventory_levels[0].inventory_item_id, 
+                      available_adjustment: quantity * -1)
+                              # save order so it isn't duplicated
+                    order = Order.new
+                    order.order_id = params["order"]["id"]
+                    order.save
+                    puts Colorize.green("Updated #{product.title} - #{carton_variant.title}")
+                  end
+                end
+
               end
             end
+
           end
 
-        end
-
-        # add Inventory back if the tube variant is purchased
-        if line_item["variant_id"] == tube_variant&.id
-          # qw12
-          tube_quantity = line_item["quantity"]
-          inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: tube_variant.inventory_item_id
-
-          order = Order.find_by_order_id params["order"]["id"]
-          unless order
-            # change InventoryLevel object for the tube variant
-            if tube_variant.inventory_management = 'shopify'
-              if inventory_levels[0].adjust(
-                  location_id: inventory_levels[0].location_id, 
-                  inventory_item_id: inventory_levels[0].inventory_item_id, 
-                  available_adjustment: tube_quantity)
-                          # save order so it isn't duplicated
-                order = Order.new
-                order.order_id = params["order"]["id"]
-                order.save
-                puts Colorize.green("Returned inv #{product.title} - #{tube_variant.title}")
-              end
-            end
-          end
         end
       end
-      
+
       screen_printing = false
       ptc_found = false
       for line_item in params["line_items"]
@@ -128,34 +108,36 @@ class OrderController < ApplicationController
         # get the Shopify Product purchased in this line item
         product = ShopifyAPI::Product.find id: line_item["product_id"] # qw12 TESTING!!
 
-        # identify the tube and carton variant 
+        # identify the carton variants and purchased carton variant
         carton_variant_ids = product.variants.select{|v| v.option1&.downcase&.include? "carton" or v.option2&.downcase&.include? "carton" or v.option3&.downcase&.include? "carton"}.map{|v| v.id}
-        tube_variant = product.variants.select{|v| v.option1&.downcase == "individual" or v.option2&.downcase == "individual" or v.option3&.downcase == "individual"}.first
+        purchased_carton_variant = product.variants.select{|v| v.id == line_item["variant_id"]}.first
 
-        # get the number of tubes per carton
-        metafields = ShopifyAPI::Metafield.all(metafield: {"owner_id" => product.id, "owner_resource" => "product"})
-        tubes_per_carton_metafield = metafields.select{|m| m.key == "tube_per_carton" and m.namespace == "custom"}.first
-        tubes_per_carton = tubes_per_carton_metafield.value if tubes_per_carton_metafield
-
-        puts Colorize.cyan("tubes_per_carton: #{tubes_per_carton}, current/carton id: #{line_item["variant_id"]}/#{carton_variant_ids}")
         if tubes_per_carton and carton_variant_ids.include? line_item["variant_id"] and refund_item["restock_type"] != "no_restock" # qw12 TESTING!! OR/AND
           order = Order.find_by_order_id "re_#{params["order"]["id"]}"
           unless order
-            # get InventoryLevel object for the tube variant
-            tube_quantity = line_item["quantity"] * tubes_per_carton
-            inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: tube_variant.inventory_item_id
 
-            # change InventoryLevel object for the tube variant
-            if tube_variant.inventory_management = 'shopify'
-              if inventory_levels[0].adjust(
-                  location_id: inventory_levels[0].location_id, 
-                  inventory_item_id: inventory_levels[0].inventory_item_id, 
-                  available_adjustment: tube_quantity)
-                          # save order so it isn't duplicated
-                order = Order.new
-                order.order_id = "re_#{params["order"]["id"]}"
-                order.save
-                puts Colorize.magenta("refunded #{product.title} - #{tube_variant.title}")
+            for carton_variant_id in carton_variant_ids
+              unless line_item["variant_id"] == carton_variant_id
+                carton_variant = product.variants.select{|v| v.id == carton_variant_id}.first
+                
+                # get InventoryLevel object for the tube variant
+                quantity = line_item["quantity"]
+                inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: carton_variant.inventory_item_id
+
+                # change InventoryLevel object for the tube variant
+                if carton_variant.inventory_management = 'shopify'
+                  if inventory_levels[0].adjust(
+                      location_id: inventory_levels[0].location_id, 
+                      inventory_item_id: inventory_levels[0].inventory_item_id, 
+                      available_adjustment: quantity)
+                              # save order so it isn't duplicated
+                    order = Order.new
+                    order.order_id = "re_#{params["order"]["id"]}"
+                    order.save
+                    puts Colorize.magenta("refunded #{product.title} - #{carton_variant.title}")
+                  end
+                end
+
               end
             end
           end
