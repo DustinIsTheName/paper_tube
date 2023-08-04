@@ -5,6 +5,9 @@ class OrderController < ApplicationController
   def change_carton_inventory
     puts Colorize.magenta(params)
 
+    mai_location_id = 28530180196
+    ptc_location_id = 15897231460
+
     verified = verify_webhook(request.body.read, request.headers["HTTP_X_SHOPIFY_HMAC_SHA256"])
 
     if verified
@@ -24,18 +27,23 @@ class OrderController < ApplicationController
           unless order
 
             for carton_variant_id in carton_variant_ids
-              unless line_item["variant_id"] == carton_variant_id
-                carton_variant = product.variants.select{|v| v.id == carton_variant_id}.first
+              
+              carton_variant = product.variants.select{|v| v.id == carton_variant_id}.first
 
-                # get InventoryLevel object for the tube variant
-                quantity = line_item["quantity"]
-                inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: carton_variant.inventory_item_id
+              # get InventoryLevel object for the tube variant
+              quantity = line_item["quantity"]
+              inventory_levels = ShopifyAPI::InventoryLevel.all inventory_item_ids: carton_variant.inventory_item_id
 
-                # change InventoryLevel object for the tube variant
-                if carton_variant.inventory_management = 'shopify'
-                  if inventory_levels[0].adjust(
-                      location_id: inventory_levels[0].location_id, 
-                      inventory_item_id: inventory_levels[0].inventory_item_id, 
+              mai_inventory_level = inventory_levels.select{|i| i.location_id == mai_location_id}.first
+              ptc_inventory_level = inventory_levels.select{|i| i.location_id == ptc_location_id}.first
+
+              # change InventoryLevel object for the tube variant
+              if carton_variant.inventory_management = 'shopify'
+
+                unless line_item["variant_id"] == carton_variant_id
+                  if mai_inventory_level.adjust(
+                      location_id: mai_inventory_level.location_id, 
+                      inventory_item_id: mai_inventory_level.inventory_item_id, 
                       available_adjustment: quantity * -1)
                               # save order so it isn't duplicated
                     order = Order.new
@@ -45,7 +53,19 @@ class OrderController < ApplicationController
                   end
                 end
 
+                if ptc_inventory_level.adjust(
+                    location_id: ptc_inventory_level.location_id, 
+                    inventory_item_id: ptc_inventory_level.inventory_item_id, 
+                    available_adjustment: quantity * -1)
+                            # save order so it isn't duplicated
+                  order = Order.new
+                  order.order_id = params["order"]["id"]
+                  order.save
+                  puts Colorize.green("Updated #{product.title} - #{carton_variant.title}")
+                end
+
               end
+
             end
 
           end
