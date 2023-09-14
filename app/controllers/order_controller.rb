@@ -17,7 +17,7 @@ class OrderController < ApplicationController
         # product = ShopifyAPI::Product.find id: 2572782862436 # <==== test product
         # get the Shopify Product purchased in this line item
         product = ShopifyAPI::Product.find id: line_item["product_id"]  # qw12 TESTING!!
-        line_item_location_id = fulfillment_orders.select{|fo| fo.line_items.select{|i| i["line_item_id"] == params["line_items"][0]["id"]}.count > 0}.first&.assigned_location_id
+        line_item_location_id = fulfillment_orders.select{|fo| fo.line_items.select{|i| i["line_item_id"] == line_item["id"]}.count > 0}.first&.assigned_location_id
 
         # identify the tube and carton variant 
         carton_variant_ids = product.variants.select{|v| v.option1&.downcase&.include? "carton" or v.option2&.downcase&.include? "carton" or v.option3&.downcase&.include? "carton"}.map{|v| v.id}
