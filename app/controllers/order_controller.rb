@@ -40,7 +40,7 @@ class OrderController < ApplicationController
               ptc_inventory_level = inventory_levels.select{|i| i.location_id == ptc_location_id}.first
 
               # change InventoryLevel object for the tube variant
-              if carton_variant.inventory_management = 'shopify'
+              if carton_variant.inventory_management == 'shopify'
 
                 unless line_item["variant_id"] == carton_variant_id
                   if line_item_location_id == mai_location_id
@@ -56,7 +56,7 @@ class OrderController < ApplicationController
                     end
                   end
 
-                  if line_item_location_id == ptc_inventory_level
+                  if line_item_location_id == ptc_location_id
                     if ptc_inventory_level.adjust(
                         location_id: ptc_inventory_level.location_id, 
                         inventory_item_id: ptc_inventory_level.inventory_item_id, 
