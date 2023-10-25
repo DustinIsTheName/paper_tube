@@ -25,7 +25,7 @@ class OrderController < ApplicationController
         # remove variable tubes_per_carton below
 
         if carton_variant_ids.include? line_item["variant_id"] # qw12 TESTING!! OR/AND
-          order = Order.find_by_order_id params["order"]["id"]
+          order = Order.find_by_order_id "#{params["order"]["id"]}-#{line_item["id"]}"
           unless order
 
             for carton_variant_id in carton_variant_ids
@@ -50,9 +50,9 @@ class OrderController < ApplicationController
                         available_adjustment: quantity * -1)
                                 # save order so it isn't duplicated
                       order = Order.new
-                      order.order_id = params["order"]["id"]
+                      order.order_id = "#{params["order"]["id"]}-#{line_item["id"]}"
                       order.save
-                      puts Colorize.green("Updated #{product.title} - #{carton_variant.title}")
+                      puts Colorize.green("Updated #{product.title} - #{carton_variant.title} by #{quantity}")
                     end
                   end
 
@@ -63,9 +63,9 @@ class OrderController < ApplicationController
                         available_adjustment: quantity * -1)
                                 # save order so it isn't duplicated
                       order = Order.new
-                      order.order_id = params["order"]["id"]
+                      order.order_id = "#{params["order"]["id"]}-#{line_item["id"]}"
                       order.save
-                      puts Colorize.green("Updated #{product.title} - #{carton_variant.title}")
+                      puts Colorize.green("Updated #{product.title} - #{carton_variant.title} by #{quantity}")
                     end
                   end
                 end
@@ -73,9 +73,11 @@ class OrderController < ApplicationController
               end
 
             end
-
+          else
+            puts Colorize.cyan "order processed before"
           end
-
+        else
+          puts Colorize.cyan "not a carton"
         end
       end
 
@@ -139,7 +141,7 @@ class OrderController < ApplicationController
         purchased_carton_variant = product.variants.select{|v| v.id == line_item["variant_id"]}.first
 
         if tubes_per_carton and carton_variant_ids.include? line_item["variant_id"] and refund_item["restock_type"] != "no_restock" # qw12 TESTING!! OR/AND
-          order = Order.find_by_order_id "re_#{params["order"]["id"]}"
+          order = Order.find_by_order_id "re_#{params["order"]["id"]}-#{line_item["id"]}"
           unless order
 
             for carton_variant_id in carton_variant_ids
@@ -158,7 +160,7 @@ class OrderController < ApplicationController
                       available_adjustment: quantity)
                               # save order so it isn't duplicated
                     order = Order.new
-                    order.order_id = "re_#{params["order"]["id"]}"
+                    order.order_id = "re_#{params["order"]["id"]}-#{line_item["id"]}"
                     order.save
                     puts Colorize.magenta("refunded #{product.title} - #{carton_variant.title}")
                   end
